@@ -6550,10 +6550,9 @@ function build2D(){
      _JOINT=null; g2pinned=false; g2.cooldownTicks(280); reflow2D();
      setTimeout(()=>{ try{ g2.centerAt(n.x,n.y,700); }catch(e){} },60); return; }
     selId=n.id; openInsp(n.id); redraw2D(); g2.centerAt(n.x,n.y,600); if(g2.zoom()<1.1) g2.zoom(1.5,600); })
-  .onBackgroundClick(()=>{ closeInsp(); redraw2D(); })
+  .onBackgroundClick(()=>{ closeInsp(); redraw2D(); });
   // 트랙 존 배경(타원 바탕 + 축 이름) 제거 — 축 구분은 위치와 판정색이 이미 하고 있다.
   // 프레임마다 노드를 전수 순회하던 비용도 함께 사라진다.
-  });
  // ★거리 균등화 — 가까운 건 멀리(최소간격·짧은링크↑), 먼 건 가까이(장거리 반발·긴링크·앵커↓)
  // 텍스트 노드(사건·허브·명제)는 글자폭이 커서 반발·간격을 더 크게
  g2.d3Force('charge').strength(n=>n.kind==='claim'?-270:(n.kind==='event'?-1150:(n.hub?-1700:-620))).distanceMax(1150);
