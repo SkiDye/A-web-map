@@ -128,9 +128,9 @@ function routeAll(){
  links.forEach(l=>{ const s=NB[l.from], t=NB[l.to]; if(!s||!t){ l._path=null; return; }
   const dx=t.x-s.x, dy=t.y-s.y, adx=Math.abs(dx), ady=Math.abs(dy);
   const tot=pairIdx[l._pk], idx=(pairSeen[l._pk]=(pairSeen[l._pk]||0)+1)-1;
-  // 오프셋: 다중선은 레인으로 벌리고, 단일선도 해시로 살짝 흩어 같은 꺾임점에 안 몰리게
-  const lane=tot>1 ? (idx-(tot-1)/2)*26 : 0;
-  const jit=(h1(l._pk+(l.label||''))-0.5)*60;
+  // 오프셋: 다중선은 레인으로 크게 벌리고, 단일선도 해시로 넓게 흩어 같은 축에 겹치지 않게.
+  const lane=tot>1 ? (idx-(tot-1)/2)*40 : 0;
+  const jit=(h1(l._pk+(l.label||''))-0.5)*130;
   const off=lane+jit;
   if(adx>=ady){ const mx=s.x+dx*0.5+off;   // 수평 우세 → 수직 꺾임(HVH)
    l._path=[[s.x,s.y],[mx,s.y],[mx,t.y],[t.x,t.y]]; }
@@ -159,10 +159,10 @@ const G=ForceGraph2D()(document.getElementById('g'))
 // ── force 클러스터 배치(지도/마인드맵) — 연결로 뭉치되 pillar 존 앵커로 구조 유지 ──
 // ★기존 force를 '조정'만 한다. forceLink를 새로 만들면 nodes 없이 초기화돼 'node not found'.
 G.d3Force('center', null);
-// 더 퍼지게 — 반발↑·링크거리↑·충돌반경↑. 직각 라우팅이 지날 여백을 확보한다.
-G.d3Force('charge').strength(n=>-260-(DEG[n.id]||0)*26).distanceMax(780);
-G.d3Force('link').distance(l=>128+rad(l.source)+rad(l.target)).strength(0.16);
-G.d3Force('collide', d3f2.forceCollide(n=>rad(n)+18).strength(0.95).iterations(3));
+// 노드를 더 떨어뜨린다 — 반발↑·링크거리↑·충돌반경↑↑. 직각 선이 지날 여백 확보.
+G.d3Force('charge').strength(n=>-340-(DEG[n.id]||0)*30).distanceMax(950);
+G.d3Force('link').distance(l=>160+rad(l.source)+rad(l.target)).strength(0.14);
+G.d3Force('collide', d3f2.forceCollide(n=>rad(n)+34).strength(1).iterations(4));
 // pillar 앵커 pull — 존 유지(약간 낮춰 더 퍼지게).
 G.d3Force('ax', d3f2.forceX(n=>ANC[n.__band]?ANC[n.__band].x:0).strength(0.10));
 G.d3Force('ay', d3f2.forceY(n=>ANC[n.__band]?ANC[n.__band].y:0).strength(0.10));
