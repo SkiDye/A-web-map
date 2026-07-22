@@ -176,11 +176,22 @@ const PCOL={aweb:{bg:'rgba(20,54,96,.22)',bd:'rgba(70,120,190,.35)',tx:'rgba(150
  bridge:{bg:'rgba(46,34,74,.22)',bd:'rgba(130,110,180,.35)',tx:'rgba(190,170,230,.9)'},
  fraud:{bg:'rgba(78,22,34,.22)',bd:'rgba(190,90,110,.35)',tx:'rgba(240,160,180,.9)'}};
 let _lc={k:null,set:null};   // 라벨 계산 캐시(상태 불변시 재계산 스킵)
+let _vp=null;                // 뷰포트 컬링 범위(그래프 좌표)
+function inVP(x,y){ return !_vp || (x>=_vp.x0&&x<=_vp.x1&&y>=_vp.y0&&y<=_vp.y1); }
+function segInVP(p){ if(!_vp) return true;   // 폴리라인 bbox가 뷰포트와 겹치나
+ let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+ for(const q of p){ x0=Math.min(x0,q[0]);y0=Math.min(y0,q[1]);x1=Math.max(x1,q[0]);y1=Math.max(y1,q[1]); }
+ return !(x1<_vp.x0||x0>_vp.x1||y1<_vp.y0||y0>_vp.y1); }
 function lblFont(scale){ return '600 '+Math.max(10.5,11.5/Math.max(1,scale*0.75))+'px Pretendard'; }
 function pathMid(l){ const P=l._path||[[l.source.x,l.source.y],[l.target.x,l.target.y]];
  let bi=0,bl=-1; for(let i=0;i<P.length-1;i++){ const dl=Math.hypot(P[i+1][0]-P[i][0],P[i+1][1]-P[i][1]); if(dl>bl){bl=dl;bi=i;} }
  return [(P[bi][0]+P[bi+1][0])/2,(P[bi][1]+P[bi+1][1])/2]; }
+const _gel=document.getElementById('g');
 G.onRenderFramePre((ctx,scale)=>{
+ // ★뷰포트 컬링 범위 — 화면에 보이는 그래프 좌표 사각형(+마진). 밖의 노드·선은 안 그린다.
+ try{ const a=G.screen2GraphCoords(0,0), b=G.screen2GraphCoords(_gel.clientWidth,_gel.clientHeight);
+  const M=200; _vp={x0:Math.min(a.x,b.x)-M,y0:Math.min(a.y,b.y)-M,x1:Math.max(a.x,b.x)+M,y1:Math.max(a.y,b.y)+M};
+ }catch(e){ _vp=null; }
  // 밴드 배경
  bands.forEach(b=>{ const dim=(curTr!=='all'&&b.tr!==curTr); const c=PCOL[b.tr];
   ctx.save(); ctx.globalAlpha=dim?0.28:1;
@@ -225,6 +236,7 @@ setTimeout(()=>G.zoomToFit(600,90),1400);
 
 // ── 노드 렌더 ──
 function drawNode(n,ctx,scale){
+ if(!inVP(n.x,n.y)) return;                 // ★뷰포트 밖은 그리지 않는다(줌인 팬 렉 감소)
  const r=rad(n), dim=(curTr!=='all'&&n.track!==curTr);
  const disc=n.discourse, foc=selId||hoverId;
  let al=1;
@@ -287,6 +299,7 @@ function paintNode(n,color,ctx){ const w=n.__w||52,h=n.__h||52; ctx.fillStyle=co
 // ── 선 렌더 (여명의 빛 라벨 박스) ──
 function drawLink(l,ctx,scale){
  const s=l.source,t=l.target; if(!s.x||!t.x) return;
+ if(l._path && !segInVP(l._path)) return;   // ★선의 경로 bbox가 화면 밖이면 스킵
  const dimS=(curTr!=='all'&&s.track!==curTr&&t.track!==curTr);
  const foc=selId||hoverId;
  const active=(selLink===l)||(foc&&(l.from===foc||l.to===foc));
