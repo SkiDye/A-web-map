@@ -221,29 +221,32 @@ G.onRenderFramePre((ctx,scale)=>{
   ctx.save(); ctx.globalAlpha=dim?0.2:0.5;
   ctx.fillStyle=c.tx; ctx.font='700 '+(15/Math.max(.5,scale))+'px Pretendard'; ctx.textAlign='left'; ctx.textBaseline='bottom';
   ctx.fillText(b.p+'  '+b.cnt, b.x0+14, b.y0-6/Math.max(.5,scale)); ctx.restore(); });
- // ★활성 선 라벨만 — 급소는 항상, 나머지는 선택/호버 노드에 연결된 선만. 헤어볼 라벨 폭발 제거.
- // 상태가 안 바뀌면 재계산 스킵(매프레임 393링크 순회+measureText는 고DPI에서 낭비).
- const lk=selId+'|'+hoverId+'|'+curTr+'|'+(showLabel?1:0)+'|'+Math.round(scale*8);
+ // ★라벨 항상 표시 — 모든 선을 후보로, 충돌회피로 공간 되는 만큼(포커스 없어도).
+ //   우선순위(선택>급소>반증>확립>정황강) 높은 것이 먼저 자리를 차지한다.
+ //   노드 bbox를 미리 채워 라벨이 노드·노드이름과 겹치지 않게 한다(라벨 부피).
+ const lk=selId+'|'+hoverId+'|'+curTr+'|'+(showLabel?1:0)+'|'+Math.round(scale*6);
  if(_lc.k===lk && _lc.set){ _labelSet=_lc.set; return; }
  _labelSet=new Set(); _lc.k=lk; _lc.set=_labelSet; if(!showLabel) return;
  ctx.font=lblFont(scale);
  const foc=selId||hoverId;
+ // 노드 bbox(+하단 이름 영역)를 충돌맵 초기값으로 — 라벨이 노드를 피한다.
+ const placed=[]; const bh=(parseFloat(lblFont(scale))||11)+7;
+ nodes.forEach(n=>{ if(curTr!=='all'&&n.track!==curTr) return; if(n.x==null) return;
+  const r=rad(n)+3; placed.push({x0:n.x-r,y0:n.y-r,x1:n.x+r,y1:n.y+r+18}); });
  const cand=[];
  links.forEach(l=>{ if(!l.label||l.source.x==null) return;
   const dimS=(curTr!=='all'&&l.source.track!==curTr&&l.target.track!==curTr); if(dimS) return;
   const active=(selLink===l)||(foc&&(l.from===foc||l.to===foc));
   const banz=(l.verdict==='반증'||l.verdict==='배제');
-  // 급소는 항상 후보. 그 외엔 활성(선택/호버 연결)일 때만.
-  if(!l.keystone && !active) return;
-  const prio=(selLink===l)?9:(active?5:(l.keystone?4:1));
+  const prio=(selLink===l)?9:(active?8:(l.keystone?7:(banz?6:(l.verdict==='확립'?5:3))));
   const m=pathMid(l);
   cand.push({l,prio,mx:m[0],my:m[1], oy:banz?14:0, w:ctx.measureText(l.label).width+12});
  });
  cand.sort((a,b)=>b.prio-a.prio);
- const placed=[]; const bh=(parseFloat(lblFont(scale))||11)+7;
  cand.forEach(c=>{ const b={x0:c.mx-c.w/2,y0:c.my-bh/2+c.oy,x1:c.mx+c.w/2,y1:c.my+bh/2+c.oy};
   const hit=placed.some(p=>!(b.x1<p.x0||b.x0>p.x1||b.y1<p.y0||b.y0>p.y1));
-  if(!hit || c.prio>=5){ placed.push(b); _labelSet.add(c.l); } });
+  // 선택/급소는 겹쳐도 강제 표시, 나머지는 공간 있을 때만
+  if(!hit || c.prio>=7){ placed.push(b); _labelSet.add(c.l); } });
 });
 
 G.graphData({nodes,links});
@@ -372,21 +375,27 @@ function drawLink(l,ctx,scale){
   if(banz){ ctx.strokeStyle=col; ctx.lineWidth=2.2; ctx.beginPath(); ctx.arc(mx,my,7,0,7); ctx.stroke();
    ctx.beginPath(); ctx.moveTo(mx-5,my-5); ctx.lineTo(mx+5,my+5); ctx.stroke(); }
  }
- // 라벨 박스 — 표시 여부는 onRenderFramePre의 충돌회피가 이미 _labelSet에 결정해 뒀다.
- const sel=(selLink===l);
- if(_labelSet.has(l)){
-  const fs=Math.max(10.5, 11.5/Math.max(1,scale*0.75));
-  ctx.font='600 '+fs+'px Pretendard'; const tw=ctx.measureText(l.label).width;
-  const pad=6, bw=tw+pad*2, bh=fs+7, oy=banz?14:0;
-  ctx.globalAlpha=0.97;
-  ctx.fillStyle=banz?'#3a1418':(l.keystone?'#463405':'#111823');
-  rr(ctx,mx-bw/2,my-bh/2+oy,bw,bh,5); ctx.fill();
-  ctx.strokeStyle=l.keystone?'#ffd23f':(banz?'#ff5555':(sel?'#1f6feb':'#2a3547')); ctx.lineWidth=sel?1.6:1; ctx.stroke();
-  ctx.fillStyle=l.keystone?'#ffd23f':'#cdd8e6'; ctx.textAlign='center'; ctx.textBaseline='middle';
-  ctx.fillText(l.label, mx, my+oy);
- }
  ctx.restore();
 }
+// ── 선 라벨 — 선·노드 위(최상위)에 그려 부피가 확실하고 다음 선에 안 덮인다. onRenderFramePost에서 일괄. ──
+function drawLabel(l,ctx,scale){
+ const banz=(l.verdict==='반증'||l.verdict==='배제'), sel=(selLink===l);
+ const m=pathMid(l), mx=m[0], my=m[1];
+ const fs=Math.max(10.5, 11.5/Math.max(1,scale*0.75));
+ ctx.font='600 '+fs+'px Pretendard'; const tw=ctx.measureText(l.label).width;
+ const pad=6, bw=tw+pad*2, bh=fs+7, oy=banz?14:0;
+ ctx.globalAlpha=1;
+ ctx.fillStyle=banz?'#3a1418':(l.keystone?'#463405':'#0f1622');
+ rr(ctx,mx-bw/2,my-bh/2+oy,bw,bh,5); ctx.fill();
+ ctx.strokeStyle=l.keystone?'#ffd23f':(banz?'#ff5555':(sel?'#1f6feb':'#39465c')); ctx.lineWidth=sel?1.8:1.1; ctx.stroke();
+ ctx.fillStyle=l.keystone?'#ffd23f':'#dbe4f0'; ctx.textAlign='center'; ctx.textBaseline='middle';
+ ctx.fillText(l.label, mx, my+oy);
+}
+G.onRenderFramePost((ctx,scale)=>{ if(!showLabel) return;
+ ctx.save(); ctx.lineJoin='round';
+ _labelSet.forEach(l=>{ if(l.source&&l.source.x!=null) drawLabel(l,ctx,scale); });
+ ctx.restore();
+});
 
 // ── 유틸 ──
 function rr(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y);
