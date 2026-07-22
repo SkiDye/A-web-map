@@ -100,19 +100,21 @@ function layout(){
    const cols=Math.max(1,Math.ceil(Math.sqrt(arr.length*1.7))), rows=Math.ceil(arr.length/cols);
    const cw=COLW[tr]/cols;
    arr.forEach((n,i)=>{ const r=Math.floor(i/cols), c=i%cols;
-    // 위치 지터는 작게 — 직교 라우팅은 정렬된 격자에서 깔끔하다(과하면 세그먼트가 어긋나 더 겹침).
-    // 시각적 위계는 크기 변주(rad)가 담당. y만 살짝 흔들어 수평선 겹침을 분산.
-    const jy=(h1(n.id+'~')-0.5)*RH*0.16;
-    n.fx=n.x=COLX[tr]-COLW[tr]/2+cw*(c+0.5); n.fy=n.y=y+56+r*RH+jy; });
+    // ★격자는 force의 초기 시드일 뿐 — fx/fy로 고정하지 않는다(force가 연결 기반으로 재배치).
+    n.x=COLX[tr]-COLW[tr]/2+cw*(c+0.5); n.y=y+56+r*RH;
+    n.__band=tr+'|'+p; });
    bands.push({tr,p,x0:COLX[tr]-COLW[tr]/2-34,x1:COLX[tr]+COLW[tr]/2+34,y0:y-14,y1:y+52+rows*RH,cnt:arr.length});
    y+=rows*RH+108;
   });
   // 트랙 세로 중앙정렬
   const bs=bands.filter(b=>b.tr===tr); const h=bs[bs.length-1].y1-bs[0].y0, off=-h/2-bs[0].y0;
-  byTP[tr]&&Object.values(byTP[tr]).forEach(arr=>arr.forEach(n=>{ n.fy+=off; n.y=n.fy; }));
+  byTP[tr]&&Object.values(byTP[tr]).forEach(arr=>arr.forEach(n=>{ n.y+=off; }));
   bs.forEach(b=>{ b.y0+=off; b.y1+=off; });
  });
+ // pillar 앵커 = 각 밴드 중심(force가 노드를 이 존으로 끌어당겨 구조 유지)
+ ANC={}; bands.forEach(b=>{ ANC[b.tr+'|'+b.p]={x:(b.x0+b.x1)/2, y:(b.y0+b.y1)/2}; });
 }
+let ANC={};
 
 // ── ★직교(맨해튼) 라우팅 — 선을 대각선 대신 수직/수평 세그먼트로. PCB 버스처럼 채널에 나란히. ──
 // track 간 선은 열 사이 세로 채널로 모으고, 채널 안에서 레인을 나눠 겹치지 않게 편다.
@@ -158,20 +160,37 @@ const links=RAW.edges.map(e=>({...e, source:e.from, target:e.to}));
 const DEG={}; links.forEach(l=>{ DEG[l.from]=(DEG[l.from]||0)+1; DEG[l.to]=(DEG[l.to]||0)+1; });
 let curTr='all', showLabel=true, selId=null, selLink=null, _labelSet=new Set();
 
-layout(); routeAll();   // ★좌표 확정 + 직교 라우팅. routeAll은 nodes(id맵)로 조회하므로 graphData 타이밍과 무관
+layout();   // 격자 시드 + pillar 앵커. 배치는 아래 force가 결정.
 
+let _pinned=false;
 const G=ForceGraph2D()(document.getElementById('g'))
  .backgroundColor('#0a0e17').nodeId('id')
- // autoPauseRedraw 기본(true) 유지 — 정적일 땐 리페인트 정지(고DPI 배터리 절약).
- // 상태변경시 redraw()가 1프레임 리드로만 예약한다(통합맵 방식).
- .warmupTicks(0).cooldownTicks(0).enableNodeDrag(false)   // 격자 고정 — 물리 없음
+ // 초기 몇 백 틱 정착 후 fx/fy 고정(onEngineStop). 정적일 땐 autoPauseRedraw로 리페인트 정지.
+ .warmupTicks(80).cooldownTicks(220).d3VelocityDecay(0.42).enableNodeDrag(false)
  .nodeCanvasObject(drawNode).nodePointerAreaPaint(paintNode)
  .linkCanvasObject(drawLink).linkCanvasObjectMode(()=>'replace')
  .linkDirectionalArrowLength(0)
  .onNodeClick(openNode).onLinkClick(openLink)
  .onBackgroundClick(closeP);   // ★호버 하이라이트 제거 — 강조는 클릭시에만
-// ForceGraph 기본 물리를 전부 죽인다(좌표는 fx/fy 고정)
-G.d3Force('charge',null).d3Force('link',null).d3Force('center',null);
+// ── force 클러스터 배치(지도/마인드맵) — 연결로 뭉치되 pillar 존 앵커로 구조 유지 ──
+// ★기존 force를 '조정'만 한다. forceLink를 새로 만들면 nodes 없이 초기화돼 'node not found'.
+G.d3Force('center', null);
+G.d3Force('charge').strength(n=>-140-(DEG[n.id]||0)*20).distanceMax(650);
+G.d3Force('link').distance(l=>72+rad(l.source)+rad(l.target)).strength(0.2);
+G.d3Force('collide', d3f2.forceCollide(n=>rad(n)+9).strength(0.9).iterations(2));
+// pillar 앵커 pull(forceX/Y로 — 커스텀보다 안정적). 노드를 자기 분야 존으로 끌어 존이 안 섞이게.
+G.d3Force('ax', d3f2.forceX(n=>ANC[n.__band]?ANC[n.__band].x:0).strength(0.14));
+G.d3Force('ay', d3f2.forceY(n=>ANC[n.__band]?ANC[n.__band].y:0).strength(0.14));
+G.onEngineStop(()=>{ if(!_pinned){ _pinned=true;
+   nodes.forEach(n=>{ n.fx=n.x; n.fy=n.y; });   // 정착 후 고정(이후 팬/줌만)
+   // ★밴드 배경을 노드 실제 클러스터 위치로 재계산(격자 시드가 아니라 force 결과에 맞춘다)
+   const bb={};
+   nodes.forEach(n=>{ const k=n.__band; if(!k) return;
+     const b=bb[k]||(bb[k]={tr:n.track,p:n.pillar,x0:1e9,y0:1e9,x1:-1e9,y1:-1e9,cnt:0});
+     const r=rad(n)+26; b.x0=Math.min(b.x0,n.x-r); b.y0=Math.min(b.y0,n.y-r);
+     b.x1=Math.max(b.x1,n.x+r); b.y1=Math.max(b.y1,n.y+r); b.cnt++; });
+   bands.length=0; Object.values(bb).forEach(b=>bands.push(b));
+   try{ G.zoomToFit(500,80); }catch(e){} redraw(); } });
 // ★크기 변주 — 연결 많은 실체를 크게(멀리서도 중심축이 보이게). 여명의 빛의 크기 위계.
 function rad(n){ if(typeof n!=='object') return 26;
  if(n.kind==='event') return 38;
@@ -247,7 +266,6 @@ G.onRenderFramePre((ctx,scale)=>{
 
 G.graphData({nodes,links});
 document.getElementById('cnt').textContent=RAW.meta.node_count+'개 실체 · '+RAW.meta.edge_count+'개 관계 (검증된 것만) · 증거는 3D에서';
-setTimeout(()=>G.zoomToFit(600,90),1400);
 
 // ── 노드 렌더 ──
 function drawNode(n,ctx,scale){
