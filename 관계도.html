@@ -101,12 +101,50 @@ function layout(){
  });
 }
 
+// ── ★직교(맨해튼) 라우팅 — 선을 대각선 대신 수직/수평 세그먼트로. PCB 버스처럼 채널에 나란히. ──
+// track 간 선은 열 사이 세로 채널로 모으고, 채널 안에서 레인을 나눠 겹치지 않게 편다.
+function chanX(a,b){ // 두 track 사이 세로 채널 x
+ const R=t=>COLX[t]+COLW[t]/2, L=t=>COLX[t]-COLW[t]/2;
+ if((a==='aweb'&&b==='bridge')||(a==='bridge'&&b==='aweb')) return (R('aweb')+L('bridge'))/2;
+ if((a==='bridge'&&b==='fraud')||(a==='fraud'&&b==='bridge')) return (R('bridge')+L('fraud'))/2;
+ return (R('aweb')+L('fraud'))/2;   // aweb↔fraud
+}
+function routeAll(){
+ const NB={}; nodes.forEach(n=>NB[n.id]=n);   // ★l.source는 graphData 후에도 좌표가 늦게 잡힌다. layout이 확정한 nodes로 직접 조회.
+ const byCh={};
+ links.forEach(l=>{ const s=NB[l.from], t=NB[l.to]; if(!s||!t) return; l._s=s; l._t=t;
+  if(s.track===t.track){                       // 같은 track — 세로 채널(열 오른쪽 여백)에서 VHV
+   const cy=(s.y+t.y)/2;
+   if(Math.abs(s.x-t.x)<6){ l._path=[[s.x,s.y],[t.x,t.y]]; return; }   // 세로 일직선
+   l._grp='V'+s.track+'|'+Math.round(cy/74);  // 근접 y끼리 레인 공유
+   (byCh[l._grp]=byCh[l._grp]||[]).push(l); l._vert=true;
+  } else {                                      // track 간 — 열 사이 세로 채널에서 HVH
+   l._grp='H'+[s.track,t.track].sort().join('|');
+   (byCh[l._grp]=byCh[l._grp]||[]).push(l); l._vert=false;
+  }
+ });
+ Object.keys(byCh).forEach(k=>{ const arr=byCh[k];
+  if(k[0]==='H'){                               // track 간: 채널 x에 레인 배분(선을 세로로 나란히)
+   const tks=k.slice(1).split('|'); const base=chanX(tks[0],tks[1]);
+   arr.sort((a,b)=>(a._s.y+a._t.y)-(b._s.y+b._t.y));
+   const span=Math.min(340,(arr.length-1)*11), step=arr.length>1?span/(arr.length-1):0;
+   arr.forEach((l,i)=>{ const cx=base-span/2+step*i; const s=l._s,t=l._t;
+    l._path=[[s.x,s.y],[cx,s.y],[cx,t.y],[t.x,t.y]]; });
+  } else {                                      // track 내: 중간 y에 레인 배분(수평선 나란히)
+   arr.sort((a,b)=>(a._s.x+a._t.x)-(b._s.x+b._t.x));
+   const span=Math.min(90,(arr.length-1)*9), step=arr.length>1?span/(arr.length-1):0;
+   arr.forEach((l,i)=>{ const s=l._s,t=l._t; const cy=(s.y+t.y)/2-span/2+step*i;
+    l._path=[[s.x,s.y],[s.x,cy],[t.x,cy],[t.x,t.y]]; });
+  }
+ });
+}
+
 const nodes=RAW.nodes.map(n=>({...n}));
 const links=RAW.edges.map(e=>({...e, source:e.from, target:e.to}));
 const DEG={}; links.forEach(l=>{ DEG[l.from]=(DEG[l.from]||0)+1; DEG[l.to]=(DEG[l.to]||0)+1; });
 let curTr='all', showLabel=true, selId=null, selLink=null, _labelSet=new Set();
 
-layout();   // ★좌표 확정 후 force 없이 렌더
+layout(); routeAll();   // ★좌표 확정 + 직교 라우팅. routeAll은 nodes(id맵)로 조회하므로 graphData 타이밍과 무관
 
 const G=ForceGraph2D()(document.getElementById('g'))
  .backgroundColor('#0a0e17').nodeId('id')
@@ -132,6 +170,9 @@ const PCOL={aweb:{bg:'rgba(20,54,96,.22)',bd:'rgba(70,120,190,.35)',tx:'rgba(150
  bridge:{bg:'rgba(46,34,74,.22)',bd:'rgba(130,110,180,.35)',tx:'rgba(190,170,230,.9)'},
  fraud:{bg:'rgba(78,22,34,.22)',bd:'rgba(190,90,110,.35)',tx:'rgba(240,160,180,.9)'}};
 function lblFont(scale){ return '600 '+Math.max(10.5,11.5/Math.max(1,scale*0.75))+'px Pretendard'; }
+function pathMid(l){ const P=l._path||[[l.source.x,l.source.y],[l.target.x,l.target.y]];
+ let bi=0,bl=-1; for(let i=0;i<P.length-1;i++){ const dl=Math.hypot(P[i+1][0]-P[i][0],P[i+1][1]-P[i][1]); if(dl>bl){bl=dl;bi=i;} }
+ return [(P[bi][0]+P[bi+1][0])/2,(P[bi][1]+P[bi+1][1])/2]; }
 G.onRenderFramePre((ctx,scale)=>{
  // 밴드 배경
  bands.forEach(b=>{ const dim=(curTr!=='all'&&b.tr!==curTr); const c=PCOL[b.tr];
@@ -158,8 +199,8 @@ G.onRenderFramePre((ctx,scale)=>{
   // 급소는 항상 후보. 그 외엔 활성(선택/호버 연결)일 때만.
   if(!l.keystone && !active) return;
   const prio=(selLink===l)?9:(active?5:(l.keystone?4:1));
-  cand.push({l,prio,mx:(l.source.x+l.target.x)/2,my:(l.source.y+l.target.y)/2,
-    oy:banz?14:0, w:ctx.measureText(l.label).width+12});
+  const m=pathMid(l);
+  cand.push({l,prio,mx:m[0],my:m[1], oy:banz?14:0, w:ctx.measureText(l.label).width+12});
  });
  cand.sort((a,b)=>b.prio-a.prio);
  const placed=[]; const bh=(parseFloat(lblFont(scale))||11)+7;
@@ -231,23 +272,33 @@ function drawLink(l,ctx,scale){
  const dimS=(curTr!=='all'&&s.track!==curTr&&t.track!==curTr);
  const foc=selId||hoverId;
  const active=(selLink===l)||(foc&&(l.from===foc||l.to===foc));
- // ★기본은 아주 옅게(격자 위 노이즈 억제). 활성 선·급소만 진하게.
+ // ★직교 라우팅으로 안 겹치니 선을 보이게 한다. 포커스 중엔 무관 선만 죽임.
  let al;
- if(dimS) al=0.03;
- else if(active) al=0.95;
+ if(dimS) al=0.04;
+ else if(active) al=0.98;
  else if(foc) al=0.05;              // 다른 노드 포커스 중 — 무관 선 죽임
- else al=l.keystone?0.6:(l.verdict==='반증'||l.verdict==='배제'?0.32:0.14);
+ else al=l.keystone?0.9:(l.verdict==='확립'?0.55:(l.verdict==='반증'||l.verdict==='배제'?0.5:0.38));
  ctx.save(); ctx.globalAlpha=al;
  const col=V[l.verdict]||'#57606a';
  const banz=(l.verdict==='반증'||l.verdict==='배제');
  ctx.strokeStyle=col; ctx.lineWidth=(active?1.5:1)*(l.keystone?3.5:(l.verdict==='확립'?1.8:1.3));
+ ctx.lineJoin='round'; ctx.lineCap='round';
  if(l.verdict==='배제'){ ctx.setLineDash([7,5]); }
- ctx.beginPath(); ctx.moveTo(s.x,s.y); ctx.lineTo(t.x,t.y); ctx.stroke(); ctx.setLineDash([]);
- const mx=(s.x+t.x)/2, my=(s.y+t.y)/2;
+ // ★직교 폴리라인 — 꺾임점을 살짝 라운드해 PCB 트레이스처럼
+ const P=l._path||[[s.x,s.y],[t.x,t.y]]; const RAD=9;
+ ctx.beginPath(); ctx.moveTo(P[0][0],P[0][1]);
+ for(let i=1;i<P.length-1;i++){ // 코너 라운드(arcTo)
+  ctx.arcTo(P[i][0],P[i][1],P[i+1][0],P[i+1][1],RAD);
+ }
+ ctx.lineTo(P[P.length-1][0],P[P.length-1][1]);
+ ctx.stroke(); ctx.setLineDash([]);
+ // 라벨·⊘ 위치 = 가장 긴 세그먼트 중앙
+ const _m=pathMid(l), mx=_m[0], my=_m[1];
  // 화살표·⊘는 활성 or 급소 or 반증일 때만(잔선엔 생략해 깔끔)
  if(active||l.keystone||banz){
-  const ang=Math.atan2(t.y-s.y,t.x-s.x), r=rad(t);
-  const ax=t.x-Math.cos(ang)*r, ay=t.y-Math.sin(ang)*r, hl=9;
+  const p1=P[P.length-2], p2=P[P.length-1];
+  const ang=Math.atan2(p2[1]-p1[1],p2[0]-p1[0]), r=rad(t);
+  const ax=p2[0]-Math.cos(ang)*r, ay=p2[1]-Math.sin(ang)*r, hl=9;
   ctx.fillStyle=col; ctx.beginPath();
   ctx.moveTo(ax,ay); ctx.lineTo(ax-Math.cos(ang-0.4)*hl,ay-Math.sin(ang-0.4)*hl);
   ctx.lineTo(ax-Math.cos(ang+0.4)*hl,ay-Math.sin(ang+0.4)*hl); ctx.closePath(); ctx.fill();
@@ -313,6 +364,8 @@ document.getElementById('lbltog').onclick=function(){ showLabel=!showLabel;
 function gotoNode(id){ const n=nodes.find(x=>x.id===decodeURIComponent(id));
  if(n){ openNode(n); G.centerAt(n.x,n.y,800); G.zoom(2.2,800); } return !!n; }
 if(location.hash) setTimeout(()=>gotoNode(location.hash.slice(1)),1400);
-window.__dbg=()=>({selId,hoverId,hash:location.hash,adjN:_adjN.size,nnodes:nodes.length,hasNec:!!nodes.find(n=>n.id==='nec')});
+window.__dbg=()=>({selId,hoverId,adjN:_adjN.size,nnodes:nodes.length,
+ routed:links.filter(l=>l._path).length, nlinks:links.length,
+ samp:links.slice(0,2).map(l=>({f:l.from,t:l.to,sx:l.source&&l.source.x,path:l._path}))});
 window.__focus=gotoNode;
 </script></body></html>
