@@ -216,19 +216,11 @@ G.onRenderFramePre((ctx,scale)=>{
    const M=200; _vp={x0:Math.min(a.x,b.x)-M,y0:Math.min(a.y,b.y)-M,x1:Math.max(a.x,b.x)+M,y1:Math.max(a.y,b.y)+M};
   }catch(e){ _vp=null; }
  } else _vp=null;
- // 밴드 배경
+ // ★밴드 배경 사각형 제거 — 라벨만 옅게 남긴다(구역 표시). 배경 겹침이 정신없음의 주범.
  bands.forEach(b=>{ const dim=(curTr!=='all'&&b.tr!==curTr); const c=PCOL[b.tr];
-  ctx.save(); ctx.globalAlpha=dim?0.28:1;
-  ctx.fillStyle=c.bg; rr(ctx,b.x0,b.y0,b.x1-b.x0,b.y1-b.y0,18); ctx.fill();
-  ctx.strokeStyle=c.bd; ctx.lineWidth=1.2; ctx.stroke();
+  ctx.save(); ctx.globalAlpha=dim?0.2:0.5;
   ctx.fillStyle=c.tx; ctx.font='700 '+(15/Math.max(.5,scale))+'px Pretendard'; ctx.textAlign='left'; ctx.textBaseline='bottom';
   ctx.fillText(b.p+'  '+b.cnt, b.x0+14, b.y0-6/Math.max(.5,scale)); ctx.restore(); });
- // 트랙 헤더(열 최상단)
- TRORD.forEach(tr=>{ const bs=bands.filter(b=>b.tr===tr); if(!bs.length) return;
-  const top=Math.min(...bs.map(b=>b.y0)), cx=COLX[tr];
-  ctx.save(); ctx.globalAlpha=(curTr!=='all'&&tr!==curTr)?0.3:1;
-  ctx.fillStyle=PCOL[tr].tx; ctx.font='800 '+(34/Math.max(.4,scale))+'px Pretendard'; ctx.textAlign='center'; ctx.textBaseline='bottom';
-  ctx.fillText(TRNAME[tr], cx, top-46/Math.max(.4,scale)); ctx.restore(); });
  // ★활성 선 라벨만 — 급소는 항상, 나머지는 선택/호버 노드에 연결된 선만. 헤어볼 라벨 폭발 제거.
  // 상태가 안 바뀌면 재계산 스킵(매프레임 393링크 순회+measureText는 고DPI에서 낭비).
  const lk=selId+'|'+hoverId+'|'+curTr+'|'+(showLabel?1:0)+'|'+Math.round(scale*8);
@@ -267,7 +259,12 @@ function drawNode(n,ctx,scale){
  else if(foc && n.id!==foc && !_adjN.has(n.id)) al=0.16;   // 포커스 무관 노드 죽임
  else if(disc) al=0.45;
  ctx.save(); ctx.globalAlpha=al;
- const sel=(n.id===selId);
+ const sel=(n.id===selId), round0=(n.group==='person');
+ // ★노드 헤일로 — 노드 주변 여백을 배경색으로 채워 선이 노드 근처서 가려지게(노드가 선 위로 뜬다)
+ ctx.fillStyle='#0a0e17';
+ ctx.beginPath();
+ if(round0) ctx.arc(n.x,n.y,r+7,0,7); else rr(ctx,n.x-r-7,n.y-r-7,(r+7)*2,(r+7)*2,11);
+ ctx.fill();
  if(n.kind==='event'){                      // 회색 사건 박스
   const w=Math.min(150, 30+ (n.label||'').length*8.5), h=30;
   ctx.fillStyle='#20252e'; rr(ctx,n.x-w/2,n.y-h/2,w,h,7); ctx.fill();
@@ -346,7 +343,7 @@ function drawLink(l,ctx,scale){
  if(dimS) al=0.04;
  else if(active) al=0.98;
  else if(foc) al=0.05;              // 다른 노드 포커스 중 — 무관 선 죽임
- else al=l.keystone?0.9:(l.verdict==='확립'?0.55:(l.verdict==='반증'||l.verdict==='배제'?0.5:0.38));
+ else al=l.keystone?0.85:(l.verdict==='확립'?0.42:(l.verdict==='반증'||l.verdict==='배제'?0.45:0.24));
  ctx.save(); ctx.globalAlpha=al;
  const col=V[l.verdict]||'#57606a';
  const banz=(l.verdict==='반증'||l.verdict==='배제');
