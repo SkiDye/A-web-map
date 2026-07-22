@@ -150,7 +150,7 @@ let _pinned=false;
 const G=ForceGraph2D()(document.getElementById('g'))
  .backgroundColor('#0a0e17').nodeId('id')
  // 초기 몇 백 틱 정착 후 fx/fy 고정(onEngineStop). 정적일 땐 autoPauseRedraw로 리페인트 정지.
- .warmupTicks(80).cooldownTicks(220).d3VelocityDecay(0.42).enableNodeDrag(false)
+ .warmupTicks(160).cooldownTicks(140).d3VelocityDecay(0.42).enableNodeDrag(false)
  .nodeCanvasObject(drawNode).nodePointerAreaPaint(paintNode)
  .linkCanvasObject(drawLink).linkCanvasObjectMode(()=>'replace')
  .linkDirectionalArrowLength(0)
@@ -166,7 +166,8 @@ G.d3Force('collide', d3f2.forceCollide(n=>rad(n)+18).strength(0.95).iterations(3
 // pillar 앵커 pull — 존 유지(약간 낮춰 더 퍼지게).
 G.d3Force('ax', d3f2.forceX(n=>ANC[n.__band]?ANC[n.__band].x:0).strength(0.10));
 G.d3Force('ay', d3f2.forceY(n=>ANC[n.__band]?ANC[n.__band].y:0).strength(0.10));
-G.onEngineStop(()=>{ if(!_pinned){ _pinned=true;
+// 정착 처리 — 노드 고정 + 밴드 재계산 + 직각 라우팅. onEngineStop과 setTimeout 백업 둘 다 호출.
+function settle(){ if(_pinned) return; _pinned=true;
    nodes.forEach(n=>{ n.fx=n.x; n.fy=n.y; });   // 정착 후 고정(이후 팬/줌만)
    // ★밴드 배경을 노드 실제 클러스터 위치로 재계산(격자 시드가 아니라 force 결과에 맞춘다)
    const bb={};
@@ -176,7 +177,10 @@ G.onEngineStop(()=>{ if(!_pinned){ _pinned=true;
      b.x1=Math.max(b.x1,n.x+r); b.y1=Math.max(b.y1,n.y+r); b.cnt++; });
    bands.length=0; Object.values(bb).forEach(b=>bands.push(b));
    routeAll();   // ★위치 확정 후 직각 라우팅
-   try{ G.zoomToFit(500,80); }catch(e){} redraw(); } });
+   try{ G.zoomToFit(500,80); }catch(e){} redraw(); }
+G.onEngineStop(settle);
+// ★백업 — onEngineStop이 안 불려도(force가 안 멈추거나 실기기 이슈) 3.5초 후 강제 정착+직각 라우팅.
+setTimeout(settle, 3500);
 // ★크기 변주 — 연결 많은 실체를 크게(멀리서도 중심축이 보이게). 여명의 빛의 크기 위계.
 function rad(n){ if(typeof n!=='object') return 26;
  if(n.kind==='event') return 38;
