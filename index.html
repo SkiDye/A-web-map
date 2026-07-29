@@ -114,7 +114,7 @@
 <div id="bar">
  <b id="ttl">통합 검증맵</b>
  <span id="vtabs"><button class="tg" id="vfund" title="자금 흐름 — 확립 금액은 굵기로, 미공시 구간은 빗금·⊘로 표시(굵기 부여 금지)">자금</button><button class="tg on" id="v2d" title="2D 관계도 — 기본 뷰(근거 정독·자금흐름)">2D</button><button class="tg" id="v3d" title="3D 궤도 뷰">3D</button></span>
- <a class="tg" id="vrel" href="관계도.html?v=260726j" target="_blank" title="캐주얼 관계도 — 검증된 관계만 실체 중심으로 단순화한 별도 뷰(증거·근거는 이 3D 맵에)" style="text-decoration:none">관계도 ↗</a>
+ <a class="tg" id="vrel" href="관계도.html?v=260726k" target="_blank" title="캐주얼 관계도 — 검증된 관계만 실체 중심으로 단순화한 별도 뷰(증거·근거는 이 3D 맵에)" style="text-decoration:none">관계도 ↗</a>
  <span id="tabs"><button class="tg on" id="trkAll">전체</button><button class="tg" id="trkA">A-WEB</button><button class="tg" id="trkF">부정선거</button></span>
  <button class="tg" id="lbltg" title="관계 라벨 표시: 선택시만/항상/끄기 순환">라벨: 선택</button>
  <button class="tg" id="edgetg" title="선 밀도: 전체 → 관계만(궤도선 숨김) → 핵심만(확립·정황강·반증·검증비협조). 복잡할 때 줄이는 용도 — 데이터는 그대로">선: 전체</button>
@@ -5656,6 +5656,7 @@ function updateHi(){
   else { const on=!f||n.id===f||nb.has(n.id); const men=!on && mset && mset.has(n.id); op = on?1:(men?0.42:0.06); }
   n.__pill.material.opacity = op;
   n.__glow.material.opacity = (f||bset)?(op>0.5?(n.id===f?0.55:0.3):0.02):n.__s0.go;
+  n.__glow.visible = n.__glow.material.opacity > 0.02;   // ★D: 투명 glow는 드로우콜에서 제외
   const k=(f&&n.id===f)?1.13:1;
   n.__pill.scale.set(n.__s0.w*k,n.__s0.h*k,1);
  });
@@ -5926,7 +5927,7 @@ function init3D(){
       opacity:0,blending:THREE.AdditiveBlending,depthWrite:false,depthTest:false});   // 상시 글로우 off(벤토=플랫)·포커스때만 발광
     const gl=new THREE.Sprite(gm);
     const gr=hasAv? sh*1.35 : sh*1.7;
-    gl.scale.set(gr,gr,1); gl.renderOrder=8;
+    gl.scale.set(gr,gr,1); gl.renderOrder=8; gl.visible=false;   // ★D: glow 초기 숨김 — opacity:0 상시렌더 796 드로우콜 제거(포커스시만 켬)
     if(hasAv) gl.position.y=sh*((112-85)/224);
     grp.add(gl);
     n.__pill=sp; n.__glow=gl; n.__s0={w:sp.scale.x,h:sp.scale.y,g:gr,go:gm.opacity};
@@ -5934,7 +5935,7 @@ function init3D(){
     //             알약: 간판 텍스처 확대 depth 마스크(colorWrite:false) — 캡슐 모양이 항상 간판과 정렬
     if(hasAv){
       const occGrp=new THREE.Group();
-      const occ=new THREE.Mesh(new THREE.SphereGeometry(sh*(83/224)*1.55,18,14),
+      const occ=new THREE.Mesh(new THREE.SphereGeometry(sh*(83/224)*1.55,12,8),
         new THREE.MeshBasicMaterial({color:0x0a0a0b}));
       occ.position.y = sh*((112-85)/224);          // 간판 중앙→사진원 중심(빌보드 로컬=화면 기준)
       occGrp.add(occ); grp.add(occGrp);
@@ -5947,7 +5948,7 @@ function init3D(){
       grp.add(occ);
       // 타원 볼륨도 중복 적용 — 빌보드 그룹(occSync)이 장축을 항상 화면 가로로 유지
       const occGrp=new THREE.Group();
-      const ell=new THREE.Mesh(new THREE.SphereGeometry(sh*0.75,16,12),
+      const ell=new THREE.Mesh(new THREE.SphereGeometry(sh*0.75,10,8),
         new THREE.MeshBasicMaterial({color:0x0a0a0b}));
       ell.scale.set(Math.min(3.8,(tex.__w/tex.__h)*0.72),1,1);   // 알약=가로 타원(여유 확대)
       occGrp.add(ell); grp.add(occGrp);
@@ -6089,8 +6090,13 @@ function init3D(){
   const a=PANC[(nd.track||'')+'|'+(nd.pillar||'')]||PANC_C;
   nd.vx+=(a.x-(nd.x||0))*0.045*alpha; nd.vy+=(a.y-(nd.y||0))*0.045*alpha; nd.vz+=(a.z-(nd.z||0))*0.045*alpha; }); });
  // 차폐 볼륨 빌보드 동기화 — 구/타원이 항상 카메라를 향해 간판과 정렬(매 프레임, 179개 copy는 무부하)
+ let __occQ=null;
  (function occSync(){
   try{ const q=g3.camera().quaternion;
+   // ★D-최적화: 카메라 회전 변화 없으면(유휴) occ·라벨 회전 갱신 생략 — rAF 무한루프의 유휴 CPU·발열·탭멈춤 제거
+   const __mv = !__occQ || (Math.abs(q.x-__occQ.x)+Math.abs(q.y-__occQ.y)+Math.abs(q.z-__occQ.z)+Math.abs(q.w-__occQ.w)) > 1e-6;
+   if(__mv){
+   __occQ={x:q.x,y:q.y,z:q.z,w:q.w};
    g3.graphData().nodes.forEach(nd=>{ if(nd.__occ) nd.__occ.quaternion.copy(q); });
    // 엣지 라벨을 선 방향으로 회전(공간 절약 — 관계가 선 따라 읽힘). 보이는 라벨만.
    g3.graphData().links.forEach(l=>{ const s=l.__lbl; if(!s||!s.visible) return;
@@ -6100,6 +6106,7 @@ function init3D(){
     if(ang>Math.PI/2) ang-=Math.PI; else if(ang<-Math.PI/2) ang+=Math.PI;   // ±90° 정규화(텍스트 안 뒤집힘)
     s.material.rotation = -ang;                     // 화면 y 반전 보정
    });
+   }
    if(tagOn && tagLineObj){                       // 언급 연결선: 포커스 있을 때만·접점만(논 포커스=전부 숨김)
     const f=focusId();
     let k=0;
