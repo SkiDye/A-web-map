@@ -118,7 +118,7 @@
 <div id="bar">
  <b id="ttl">통합 검증맵</b>
  <span id="vtabs"><button class="tg" id="vfund" title="자금 흐름 — 확립 금액은 굵기로, 미공시 구간은 빗금·⊘로 표시(굵기 부여 금지)">자금</button><button class="tg on" id="v2d" title="2D 관계도 — 기본 뷰(근거 정독·자금흐름)">2D</button><button class="tg" id="v3d" title="3D 궤도 뷰">3D</button></span>
- <a class="tg" id="vrel" href="관계도.html?v=260726t" target="_blank" title="캐주얼 관계도 — 검증된 관계만 실체 중심으로 단순화한 별도 뷰(증거·근거는 이 3D 맵에)" style="text-decoration:none">관계도 ↗</a>
+ <a class="tg" id="vrel" href="관계도.html?v=260726u" target="_blank" title="캐주얼 관계도 — 검증된 관계만 실체 중심으로 단순화한 별도 뷰(증거·근거는 이 3D 맵에)" style="text-decoration:none">관계도 ↗</a>
  <span id="tabs"><button class="tg on" id="trkAll">전체</button><button class="tg" id="trkA">A-WEB</button><button class="tg" id="trkF">부정선거</button></span>
  <button class="tg" id="lbltg" title="관계 라벨 표시: 선택시만/항상/끄기 순환">라벨: 선택</button>
  <button class="tg" id="edgetg" title="선 밀도: 전체 → 관계만(궤도선 숨김) → 핵심만(확립·정황강·반증·검증비협조). 복잡할 때 줄이는 용도 — 데이터는 그대로">선: 전체</button>
@@ -6732,6 +6732,17 @@ function redraw2D(){
   try{ g2.nodeCanvasObject(draw2dNode); }catch(e){}
  });
 }
+const GL2D=/[?&]gl2d=1/.test(location.search||'');   // P1: GPU-2D 프로토타입 플래그(기본 off·fg2d/관계도.html 무접촉·되돌림=이 블록 제거)
+function enterGL2D(){   // 3D(WebGL) 엔진을 top-down 평면으로 재사용 → 2D를 GPU로 렌더(fg2d Canvas CPU 우회)
+ if(!g3){ init3D(); }
+ try{
+   g3.numDimensions(2);                                    // 레이아웃 z=0 평면 고정
+   const c=g3.controls(); c.enableRotate=false; if('screenSpacePanning' in c) c.screenSpacePanning=true;   // 회전잠금·평면 팬
+   g3.cameraPosition({x:0,y:0,z:1400},{x:0,y:0,z:0},600);  // top-down(원거리 원근≈평행투영)
+   g3.resumeAnimation();
+ }catch(_){}
+ size3d();
+}
 function switchView(v){
  if(v===view) return; view=v;
  document.getElementById('v2d').classList.toggle('on',v==='2d');
@@ -6780,6 +6791,8 @@ function restyleBoard(){
 function boot(){
  restyleBoard();
  try{ const h=decodeURIComponent(location.hash.slice(1)); if(h&&CARDS[h]) pendingFocus=h; }catch(_){}   // 전체 모드 기본 — 트랙 전환 불필요
+ if(GL2D){ view='3d'; document.body.classList.remove('view2d'); enterGL2D(); apply(); window.__ready=true;
+   try{console.log('[GPU-2D 프로토타입] ?gl2d=1 · fg2d Canvas 우회 · 3D 엔진 top-down · 좌하단 HUD로 CPU경로(플래그off)와 FPS/draw 대조');}catch(_){} return; }
  document.body.classList.add('view2d');   // 2D 관계도 = 기본 메인 뷰
  const _auto=document.getElementById('rcAuto'); if(_auto) _auto.style.display='none';   // 3D 전용 자동회전 숨김
  build2D();
