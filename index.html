@@ -118,7 +118,7 @@
 <div id="bar">
  <b id="ttl">통합 검증맵</b>
  <span id="vtabs"><button class="tg" id="vfund" title="자금 흐름 — 확립 금액은 굵기로, 미공시 구간은 빗금·⊘로 표시(굵기 부여 금지)">자금</button><button class="tg on" id="v2d" title="2D 관계도 — 기본 뷰(근거 정독·자금흐름)">2D</button><button class="tg" id="v3d" title="3D 궤도 뷰">3D</button></span>
- <a class="tg" id="vrel" href="관계도.html?v=260731i" target="_blank" title="캐주얼 관계도 — 검증된 관계만 실체 중심으로 단순화한 별도 뷰(증거·근거는 이 3D 맵에)" style="text-decoration:none">관계도 ↗</a>
+ <a class="tg" id="vrel" href="관계도.html?v=260731j" target="_blank" title="캐주얼 관계도 — 검증된 관계만 실체 중심으로 단순화한 별도 뷰(증거·근거는 이 3D 맵에)" style="text-decoration:none">관계도 ↗</a>
  <span id="tabs"><button class="tg on" id="trkAll">전체</button><button class="tg" id="trkA">A-WEB</button><button class="tg" id="trkF">부정선거</button></span>
  <button class="tg" id="lbltg" title="관계 라벨 표시: 선택시만/항상/끄기 순환">라벨: 선택</button>
  <button class="tg" id="edgetg" title="선 밀도: 전체 → 관계만(궤도선 숨김) → 핵심만(확립·정황강·반증·검증비협조). 복잡할 때 줄이는 용도 — 데이터는 그대로">선: 전체</button>
@@ -5574,7 +5574,7 @@ function pillarAnchors(){
  [...new Set(VNODES.filter(n=>n.track==='bridge'&&n.pillar&&n.pillar!=='허브'&&n.pillar!=='교차').map(n=>n.pillar))]
    .forEach((p,i)=>{ A['bridge|'+p]={x:(i%2?1:-1)*(90+Math.floor(i/2)*80), y:210, z:i%2?110:-110}; });
  // ★트랙별 은하 중심(x,y,반경) — fraud 중앙(대은하)·money 우·cartel 좌·lineage 하 (2026-07-31 트랙개편)
- const TCEN={fraud:[0,0,360], money:[980,-40,250], cartel:[-980,-40,230], lineage:[0,900,250]};
+ const TCEN={fraud:[0,0,320], money:[520,-120,200], cartel:[-520,-120,190], lineage:[0,520,200]};
  Object.keys(TCEN).forEach(tr=>{
   const cx=TCEN[tr][0], cy=TCEN[tr][1], R=TCEN[tr][2];
   A[tr+'|허브']={x:cx,y:cy,z:0};
