@@ -5772,7 +5772,7 @@ function pillTexture(n){
  const cx=W/2, cy=RING+AV/2+2;
  // 원형 사진(메인) — 판정색 링
  x.save(); x.beginPath(); x.arc(cx,cy,AV/2,0,Math.PI*2); x.clip();
- const av=useImg?nodeImg(useImg,()=>{ delete pillCache[n.id]; if(!n.img) refreshPill(n); if(typeof view!=='undefined'&&view==='2d') redraw2D(); }):null;
+ const av=useImg?nodeImg(useImg,()=>{ delete pillCache[n.id]; if(!n.logo) refreshPill(n); if(typeof view!=='undefined'&&view==='2d') redraw2D(); }):null;
  if(av && av.ok===true && av.im){                       // 로고·프로필 실물을 원 안에 커버 크롭
   const im=av.im, ar=im.width/im.height;
   let sw,sh,sx,sy;
