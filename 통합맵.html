@@ -5731,7 +5731,7 @@ function blindBadge(x,bx,by,bc,badv){
  const d=(r-3)*0.72; x.beginPath(); x.moveTo(bx-d,by+d); x.lineTo(bx+d,by-d); x.stroke();
  if(badv){ x.strokeStyle=bc; x.lineWidth=1.4; x.beginPath(); x.arc(bx,by,r+3,0,Math.PI*2); x.stroke(); }
 }
-const DEFAV={company:'thumbs/default_company.png',vendor:'thumbs/default_company.png',gov:'thumbs/default_gov.png',agency:'thumbs/default_gov.png',court:'thumbs/default_gov.png',intl:'thumbs/default_intl.png',aweb:'thumbs/default_intl.png',china:'thumbs/default_gov.png',party:'thumbs/default_party.png',media:'thumbs/default_media.png',community:'thumbs/default_community.png'};
+const DEFAV={person:'thumbs/default_person.png',company:'thumbs/default_company.png',vendor:'thumbs/default_company.png',gov:'thumbs/default_gov.png',agency:'thumbs/default_gov.png',court:'thumbs/default_gov.png',intl:'thumbs/default_intl.png',aweb:'thumbs/default_intl.png',china:'thumbs/default_gov.png',party:'thumbs/default_party.png',media:'thumbs/default_media.png',community:'thumbs/default_community.png'};
 function subOf(n){   // ★관계 리본용 부제: headline에서 라벨을 뗀 첫 구절(지위·소속·이력)
  const c=(typeof CARDS!=='undefined')?CARDS[n.id]:null;
  if(!c||!c.headline) return '';
@@ -5744,6 +5744,11 @@ function subOf(n){   // ★관계 리본용 부제: headline에서 라벨을 뗀
  if(!sub || sub.length<2) sub=h.trim();
  if(sub.length>22) sub=sub.slice(0,21)+'…';
  return sub;
+}
+function refreshPill(n){   // ★DEFAV 기본아바타 비동기 로드 완료시 3D 스프라이트 텍스처 교체(logo의 tex.needsUpdate와 대칭)
+ if(!n.__pill||!n.__pill.material) return;
+ const t=pillTexture(n);
+ n.__pill.material.map=t; n.__pill.material.needsUpdate=true;
 }
 function pillTexture(n){
  if(pillCache[n.id]) return pillCache[n.id];
@@ -5767,7 +5772,7 @@ function pillTexture(n){
  const cx=W/2, cy=RING+AV/2+2;
  // 원형 사진(메인) — 판정색 링
  x.save(); x.beginPath(); x.arc(cx,cy,AV/2,0,Math.PI*2); x.clip();
- const av=useImg?nodeImg(useImg,()=>{ delete pillCache[n.id]; if(typeof view!=='undefined'&&view==='2d') redraw2D(); }):null;
+ const av=useImg?nodeImg(useImg,()=>{ delete pillCache[n.id]; if(!n.img) refreshPill(n); if(typeof view!=='undefined'&&view==='2d') redraw2D(); }):null;
  if(av && av.ok===true && av.im){                       // 로고·프로필 실물을 원 안에 커버 크롭
   const im=av.im, ar=im.width/im.height;
   let sw,sh,sx,sy;
