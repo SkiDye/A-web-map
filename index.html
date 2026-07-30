@@ -5782,9 +5782,13 @@ function pillTexture(n){
   const g2=x.createLinearGradient(cx-AV/2,cy-AV/2,cx+AV/2,cy+AV/2);
   g2.addColorStop(0,'#3d4f6b'); g2.addColorStop(1,'#222b3c');
   x.fillStyle=g2; x.fillRect(cx-AV/2,cy-AV/2,AV,AV);
-  const name=(n.lbl||'').replace(/^[^ ]* /,'').trim()||n.lbl;
-  x.fillStyle='#dde6f0'; x.font='700 58px '+FSTK; x.textAlign='center'; x.textBaseline='middle';
-  x.fillText(name.slice(0,2),cx,cy+2); x.textAlign='left';
+  // 인물 이름 최대 3글자(한국 이름은 보통 3자) — 괄호·직함·부가정보·지분표기 제거
+  const head=(n.lbl||'').split('\n')[0].split(/[(（]/)[0].trim();  // 줄바꿈·괄호 앞(직함·부가정보 제거)
+  const km=head.match(/[가-힣]{2,4}/);                             // 괄호 전 한글 이름 덩어리 우선
+  const name=(km?km[0]:head.replace(/ .*$/,'')).slice(0,3);        // 없으면 첫 단어(외국명) 앞 3자
+  const fs=name.length>=3?46:58;                                   // 3글자면 폰트 축소(아바타 폭 초과 방지)
+  x.fillStyle='#dde6f0'; x.font='700 '+fs+'px '+FSTK; x.textAlign='center'; x.textBaseline='middle';
+  x.fillText(name,cx,cy+2); x.textAlign='left';
  } else {
   x.fillStyle='#eef1f4'; x.fillRect(cx-AV/2,cy-AV/2,AV,AV);
  }
