@@ -118,7 +118,7 @@
 <div id="bar">
  <b id="ttl">통합 검증맵</b>
  <span id="vtabs"><button class="tg" id="vfund" title="자금 흐름 — 확립 금액은 굵기로, 미공시 구간은 빗금·⊘로 표시(굵기 부여 금지)">자금</button><button class="tg on" id="v2d" title="2D 관계도 — 기본 뷰(근거 정독·자금흐름)">2D</button><button class="tg" id="v3d" title="3D 궤도 뷰">3D</button></span>
- <a class="tg" id="vrel" href="관계도.html?v=260726y" target="_blank" title="캐주얼 관계도 — 검증된 관계만 실체 중심으로 단순화한 별도 뷰(증거·근거는 이 3D 맵에)" style="text-decoration:none">관계도 ↗</a>
+ <a class="tg" id="vrel" href="관계도.html?v=260726z" target="_blank" title="캐주얼 관계도 — 검증된 관계만 실체 중심으로 단순화한 별도 뷰(증거·근거는 이 3D 맵에)" style="text-decoration:none">관계도 ↗</a>
  <span id="tabs"><button class="tg on" id="trkAll">전체</button><button class="tg" id="trkA">A-WEB</button><button class="tg" id="trkF">부정선거</button></span>
  <button class="tg" id="lbltg" title="관계 라벨 표시: 선택시만/항상/끄기 순환">라벨: 선택</button>
  <button class="tg" id="edgetg" title="선 밀도: 전체 → 관계만(궤도선 숨김) → 핵심만(확립·정황강·반증·검증비협조). 복잡할 때 줄이는 용도 — 데이터는 그대로">선: 전체</button>
@@ -5500,7 +5500,7 @@ const VCL={'확립':'#3fb950','정황강':'#e8834e','정황약':'#d4a72c','단�
 const CLSCL={'J':'#3fb950','G':'#4ac26b','R':'#57c576','S':'#539bf5','A':'#a371f7','D':'#d4a72c','P':'#dcae3c','C':'#f85149'};
 function vbStyle(v){ const b=VC[v]||'#57606a', l=VCL[v]||'#c9d1d9';
  return 'background:'+hex2rgba(b,0.1)+';color:'+l+';border:1.5px solid '+hex2rgba(b,0.55); }
-const FRESH=["org_172", "org_174", "p_25"];   // sync_data.py 자동 주입: 이번 갱신 노드
+const FRESH=[];   // sync_data.py 자동 주입: 이번 갱신 노드
 const FRESHSET=new Set(FRESH);
 // 단일기둥·단일출처 의존 노드 자동 탐지(⚠ 텍스트 기반) — 점선 링 + 인스펙터 뱃지
 const SINGLE=new Set(Object.keys(CARDS).filter(id=>
@@ -5537,7 +5537,7 @@ function updateChipCounts(){
 }
 // ── 3D 탭 ──
 let g3=null, selId=null, g3key='', g3fitT=0;
-let view='2d', g2=null, hovL=null;   // 2D 관계도 = 기본 메인 뷰 · hovL=호버 엣지
+let view='3d', g2=null, hovL=null;   // ★3D 퍼스트(기본 메인 뷰) · hovL=호버 엣지
 let lblMode='sel', pendingFocus=null, shotOn=false, blindOn=false;   // blindOn=검증사각만 강조(파묘 worklist)
 let edgeMode='all';
 let presetIds=null, presetOn='';   // 프리셋(검증비협조/자금흐름/거버넌스) 노드 한정   // 선 밀도: all(전체) → rel(궤도선 숨김) → key(확립·정황강·반증·검증비협조만)
@@ -6055,7 +6055,7 @@ function init3D(){
      g3.cameraPosition({x:t.x+(c.x-t.x)*f, y:t.y+(c.y-t.y)*f, z:t.z+(c.z-t.z)*f}, t, ms?Math.round(ms*0.7):0); }catch(_){} }, ms?ms+40:20);
  };
  g3.onEngineStop(()=>{ if(!fit0){fit0=true; fitView(700); g3.warmupTicks(0);
-  if(pendingFocus){ const id=pendingFocus; pendingFocus=null; setTimeout(()=>jump(id),900); }   // 딥링크(#노드id) 진입
+  pendingFocus=null;   // ★초기 노드 자동선택 제거(사용자 요청) — 딥링크 jump 비활성, 정렬(fitView)만 유지
  } });   // 이후 필터 변경시 동기 60틱 생략
  window.addEventListener('resize',size3d);
  // 팬 강화(우클릭 드래그)
@@ -6793,9 +6793,8 @@ function boot(){
  try{ const h=decodeURIComponent(location.hash.slice(1)); if(h&&CARDS[h]) pendingFocus=h; }catch(_){}   // 전체 모드 기본 — 트랙 전환 불필요
  if(GL2D){ view='3d'; document.body.classList.remove('view2d'); enterGL2D(); apply(); window.__ready=true;
    try{console.log('[GPU-2D 프로토타입] ?gl2d=1 · fg2d Canvas 우회 · 3D 엔진 top-down · 좌하단 HUD로 CPU경로(플래그off)와 FPS/draw 대조');}catch(_){} return; }
- document.body.classList.add('view2d');   // 2D 관계도 = 기본 메인 뷰
- const _auto=document.getElementById('rcAuto'); if(_auto) _auto.style.display='none';   // 3D 전용 자동회전 숨김
- build2D();
+ view='3d'; document.body.classList.remove('view2d');   // ★3D 퍼스트
+ if(!g3){ init3D(); }
  apply();
  window.__ready=true;
 }
@@ -6845,7 +6844,7 @@ if(document.fonts&&document.fonts.load){ document.fonts.load('700 16px "Pretenda
   if(e.key==='Escape')close(); else if(e.key==='ArrowRight')document.getElementById('onbNext').click(); else if(e.key==='ArrowLeft')document.getElementById('onbPrev').click(); });
  const ht=document.getElementById('helptg'); if(ht) ht.onclick=()=>open(0);
  window.__openTour=open;
- try{ if(!localStorage.getItem('awebmap_seen')) setTimeout(()=>open(0), 1000); }catch(e){}
+ // ★처음 방문 자동 온보딩 제거(사용자 요청) — 우측 도움말(helptg) 버튼으로 수동 열기만 유지
 })();
 
 // ── 자금 흐름 뷰 — 확립 금액=굵기 / 미공시=고정폭 빗금+⊘(굵기 부여 금지: 규모 오독 방지) ──
