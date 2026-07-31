@@ -118,7 +118,7 @@
 <div id="bar">
  <b id="ttl">통합 검증맵</b>
  <span id="vtabs"><button class="tg" id="vfund" title="자금 흐름 — 확립 금액은 굵기로, 미공시 구간은 빗금·⊘로 표시(굵기 부여 금지)">자금</button><button class="tg on" id="v2d" title="2D 관계도 — 기본 뷰(근거 정독·자금흐름)">2D</button><button class="tg" id="v3d" title="3D 궤도 뷰">3D</button></span>
- <a class="tg" id="vrel" href="관계도.html?v=260731x" target="_blank" title="캐주얼 관계도 — 검증된 관계만 실체 중심으로 단순화한 별도 뷰(증거·근거는 이 3D 맵에)" style="text-decoration:none">관계도 ↗</a>
+ <a class="tg" id="vrel" href="관계도.html?v=260731y" target="_blank" title="캐주얼 관계도 — 검증된 관계만 실체 중심으로 단순화한 별도 뷰(증거·근거는 이 3D 맵에)" style="text-decoration:none">관계도 ↗</a>
  <span id="tabs"><button class="tg on" id="trkAll">전체</button><button class="tg" id="trkA">A-WEB</button><button class="tg" id="trkF">부정선거</button></span>
  <button class="tg" id="lbltg" title="관계 라벨 표시: 선택시만/항상/끄기 순환">라벨: 선택</button>
  <button class="tg" id="edgetg" title="선 밀도: 전체 → 관계만(궤도선 숨김) → 핵심만(확립·정황강·반증·검증비협조). 복잡할 때 줄이는 용도 — 데이터는 그대로">선: 전체</button>
@@ -5512,7 +5512,7 @@ const VCL={'확립':'#3fb950','정황강':'#e8834e','정황약':'#d4a72c','단�
 const CLSCL={'J':'#3fb950','G':'#4ac26b','R':'#57c576','S':'#539bf5','A':'#a371f7','D':'#d4a72c','P':'#dcae3c','C':'#f85149'};
 function vbStyle(v){ const b=VC[v]||'#57606a', l=VCL[v]||'#c9d1d9';
  return 'background:'+hex2rgba(b,0.1)+';color:'+l+';border:1.5px solid '+hex2rgba(b,0.55); }
-const FRESH=["party_ppp", "atomy", "park_hangil", "atomy_sa_plhd_partners", "yantai_kolmar_atomy", "ruach_investment"];   // sync_data.py 자동 주입: 이번 갱신 노드
+const FRESH=[];   // sync_data.py 자동 주입: 이번 갱신 노드
 const FRESHSET=new Set(FRESH);
 // 단일기둥·단일출처 의존 노드 자동 탐지(⚠ 텍스트 기반) — 점선 링 + 인스펙터 뱃지
 const SINGLE=new Set(Object.keys(CARDS).filter(id=>
@@ -5813,7 +5813,7 @@ function pillTexture(n){
   x.fillStyle='#dde6f0'; x.font='700 '+fs+'px '+FSTK; x.textAlign='center'; x.textBaseline='middle';
   x.fillText(name,cx,cy+2); x.textAlign='left';
  } else {
-  x.fillStyle='#eef1f4'; x.fillRect(cx-AV/2,cy-AV/2,AV,AV);
+  x.fillStyle='#232a36'; x.fillRect(cx-AV/2,cy-AV/2,AV,AV);   // 기본아바타 로딩중/무아바타 = 어두운 원반(흰색 방지·로드되면 아이콘으로 교체)
  }
  x.restore();
  x.beginPath(); x.arc(cx,cy,AV/2+2,0,Math.PI*2); x.strokeStyle=n.col; x.lineWidth=4; x.stroke();   // ★세력(comm) 색 링
@@ -5896,9 +5896,12 @@ function smallSrc(src){
 function nodeImg(src, cb){
  const key=smallSrc(src);
  let e=_imgC[key];
- if(e){ if(!(e.ok===true && !e.im)) return e; delete _imgC[key]; }   // 원본 해제분은 재로드
- e=_imgC[key]={im:new Image(), ok:false};
- e.im.onload=()=>{ e.ok=true; if(cb) cb(); };
+ if(e){
+  if(cb && e.ok!==true) (e.cbs=e.cbs||[]).push(cb);   // ★로딩중이면 콜백 큐에 누적 — 같은 공유이미지(기본아바타)를 쓰는 모든 노드가 로드 완료시 재렌더되도록(종전엔 첫 노드만 cb 등록돼 나머지가 흰색 fallback에 잔존)
+  if(!(e.ok===true && !e.im)) return e; delete _imgC[key];
+ }
+ e=_imgC[key]={im:new Image(), ok:false, cbs:cb?[cb]:[]};
+ e.im.onload=()=>{ e.ok=true; const q=e.cbs||[]; e.cbs=[]; q.forEach(f=>{ try{f()}catch(_){} }); };
  e.im.onerror=()=>{                                  // 축소본이 없으면 원본으로 1회 폴백
   if(key!==src && !e.__fb){ e.__fb=1; e.im.src=src; return; }
   e.ok='err'; e.im=null;
